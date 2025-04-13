@@ -1,0 +1,16 @@
+# Ignore everything by default
+*
+
+# Allow Git to track .gitignore itself and README (if needed)
+!.gitignore
+!README.md
+
+# Opt-in to specific filesfolders (example below)
+!UnlimitedEnergy/
+!UnlimitedEnergy/UnlimitedEnergy.cs
+
+!AbilitySwitcher/
+!AbilitySwitcher/AbilitySwitcher.cs
+
+!ItemPicker/
+!ItemPicker/ItemPicker.cs
