@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Localization;
 using Zorro.Settings;
 
-namespace UnlimitedEnergy;
+namespace FullEnergyStart;
 
 [LandfallPlugin]
 public class Program
