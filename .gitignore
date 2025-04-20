@@ -7,13 +7,17 @@
 
 # Opt-in to specific filesfolders (example below)
 !UnlimitedEnergy/
-!UnlimitedEnergy/UnlimitedEnergy.cs
+UnlimitedEnergy/*
+!UnlimitedEnergy/*.cs
 
 !AbilitySwitcher/
-!AbilitySwitcher/AbilitySwitcher.cs
+AbilitySwitcher/*
+!AbilitySwitcher/*.cs
 
 !ItemPicker/
-!ItemPicker/ItemPicker.cs
+ItemPicker/*
+!ItemPicker/*.cs
 
-!FullEnergyStart/
-!FullEnergyStart/FullEnergyStart.cs
+!VocalSwap/
+VocalSwap/*
+!VocalSwap/*.cs
