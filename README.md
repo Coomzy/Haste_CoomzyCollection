@@ -20,3 +20,8 @@ Pick items in the hub world to start a shard run with!
 New run, new level, new life. Always start with full energy!
 <br/>
 <img src="https://images.steamusercontent.com/ugc/26566434765610194/24B355BA9284F5526F8D805496A989A67EB72B16/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false" width="600"/>
+
+## Vocal Swap - [Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3464342654)
+A tool allowing you to swap vocals for the Zoe.
+<br/>
+<img src="https://images.steamusercontent.com/ugc/26566983844545278/7D6522C29249C32666EB78F9B40A84CCAB11EEAE/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false" width="600"/>
