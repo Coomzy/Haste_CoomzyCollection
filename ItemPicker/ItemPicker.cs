@@ -1,11 +1,6 @@
 ﻿using Landfall.Haste;
 using Landfall.Modding;
 using System.Collections;
-using System.Net.Sockets;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Runtime.Remoting.Metadata.W3cXsd2001;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Localization;
@@ -13,6 +8,8 @@ using UnityEngine.UIElements;
 using Zorro.ControllerSupport;
 using Zorro.Core;
 using Zorro.Settings;
+
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
 
 namespace ItemPicker;
 
@@ -35,7 +32,7 @@ public class ItemPickerUpdater : MonoBehaviour
 	public static InputAction addSelectedItemAction = new InputAction("addSelectedItem", InputActionType.Button);
 	public static InputAction resetItemsAction = new InputAction("resetItemsAction", InputActionType.Button);
 
-	void Awake()
+	public void Awake()
 	{
 		StartCoroutine(WaitForLoad());
 	}
@@ -66,7 +63,7 @@ public class ItemPickerUpdater : MonoBehaviour
 	}
 
 	// This does work
-	IEnumerator Start()
+	public IEnumerator Start()
 	{
 		while (GameHandler.Instance?.SettingsHandler == null)
 		{
@@ -76,7 +73,7 @@ public class ItemPickerUpdater : MonoBehaviour
 		SetupKeybinds();
 	}
 
-	void OnEnable()
+	public void OnEnable()
 	{
 		GM_API.SpawnedInHub += SpawnedInHub;
 		GM_API.StartNewRun += StartNewRun;
@@ -88,7 +85,7 @@ public class ItemPickerUpdater : MonoBehaviour
 		SetupKeybinds();
 	}
 
-	void OnDisable()
+	public void OnDisable()
 	{
 		GM_API.SpawnedInHub -= SpawnedInHub;
 		GM_API.StartNewRun -= StartNewRun;
@@ -96,12 +93,16 @@ public class ItemPickerUpdater : MonoBehaviour
 
 	void SpawnedInHub()
 	{
-		if (!GM_Hub.isInHub)
-			return;
+		/*if (!GM_Hub.isInHub)
+			return;*/
 
-		ApplyItems();
+		//ApplyItems();
 
-		Player.localPlayer.character.restartAction += ApplyItems;
+		if (Player.localPlayer.character.restartAction == null ||
+			!Player.localPlayer.character.restartAction.GetInvocationList().Contains((Action)PlayerRestart))
+		{
+			Player.localPlayer.character.restartAction += PlayerRestart;
+		}
 	}
 
 	void StartNewRun()
@@ -122,7 +123,18 @@ public class ItemPickerUpdater : MonoBehaviour
 		items.Clear();
 	}
 
-	void Update()
+	int lastFrameRestarted = -1;
+	void PlayerRestart()
+	{
+		if (Time.frameCount == lastFrameRestarted)
+			return;
+
+		lastFrameRestarted = Time.frameCount;
+
+		ApplyItems();
+	}
+
+	public void Update()
 	{
 		if (!UI_UnlockedItemsScreen.IsOpen)
 			return;
@@ -132,16 +144,15 @@ public class ItemPickerUpdater : MonoBehaviour
 			RemoveAllItems();
 		}
 
+		if (!addSelectedItemAction.WasPressedThisFrame())
+			return;
+
 		UI_ItemIcon selectedIcon = null;
 		foreach (var iconGO in UI_UnlockedItemsScreen.Instance.icons)
 		{
 			var itemIcon = iconGO.GetComponentInChildren<UI_ItemIcon>();
 
-			var isHoveredField = typeof(UI_ItemIcon).GetField("isHovered", BindingFlags.Instance | BindingFlags.NonPublic);
-			if (isHoveredField == null)
-				continue;
-
-			var isHovered = (bool)isHoveredField.GetValue(itemIcon);
+			var isHovered = itemIcon.GetProperty<bool>("isHovered");
 			if (!isHovered)
 				continue;
 
@@ -150,23 +161,45 @@ public class ItemPickerUpdater : MonoBehaviour
 		}
 
 		if (selectedIcon == null)
+		{
 			return;
+		}
 
-		var itemRefField = typeof(UI_ItemIcon).GetField("itemRef", BindingFlags.Instance | BindingFlags.NonPublic);
-		if (itemRefField == null)
-			return;
-
-		var selectedItem = (ItemInstance)itemRefField.GetValue(selectedIcon);
+		var selectedItem = selectedIcon.itemRef;
 		if (selectedItem == null)
+		{
 			return;
-
-		if (!addSelectedItemAction.WasPressedThisFrame())
-			return;
+		}
 
 		items.Add(selectedItem);
 		ApplyItem(selectedItem);
 		SaveItems();
 	}
+
+	//[Conditional("DEBUG")]
+	/*void OnGUI()
+	{
+		GUILayout.BeginArea(new Rect(10, 10, 400, Screen.height - 20));
+
+		if (items == null)
+		{
+			GUILayout.Label("items is null");
+			GUILayout.EndArea();
+			return;
+		}
+
+		GUILayout.Label($"items count: {items.Count}");
+		for (int i = 0; i < items.Count; i++)
+		{
+			var item = items[i];
+			GUILayout.Label($"items[{i}]: {item.itemName}");
+		}
+
+		//GUILayout.Label($"lastFailCase: {lastFailCase}");
+
+		GUILayout.EndArea();
+	}*/
+
 
 	public static void ApplyItems()
 	{
@@ -185,20 +218,8 @@ public class ItemPickerUpdater : MonoBehaviour
 			return;
 		}
 
-		var methodAddItem = typeof(Player).GetMethod("AddItem", BindingFlags.Instance | BindingFlags.NonPublic);
-		if (methodAddItem == null)
-		{
-			throw new MissingMethodException("Couldn't find AddItem method on Player.");
-		}
-
-		var methodBoughtItem = typeof(Player).GetMethod("BoughtItem", BindingFlags.Instance | BindingFlags.NonPublic);
-		if (methodBoughtItem == null)
-		{
-			throw new MissingMethodException("Couldn't find BoughtItem method on Player.");
-		}
-
-		methodAddItem.Invoke(Player.localPlayer, new object[] { itemInstance, 0 });
-		methodBoughtItem.Invoke(Player.localPlayer, new object[] { itemInstance });
+		Player.localPlayer.Call("AddItem", itemInstance);
+		Player.localPlayer.Call("BoughtItem", itemInstance);
 	}
 
 	public static void RemoveAllItems()
@@ -246,8 +267,6 @@ public class ItemPickerUpdater : MonoBehaviour
 
 		//Debug.Log($"Loaded {items.Count} items from {savePath}");
 	}
-
-
 
 	public static void SetupKeybinds()
 	{

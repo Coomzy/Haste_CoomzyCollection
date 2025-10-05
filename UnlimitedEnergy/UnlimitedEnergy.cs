@@ -1,8 +1,5 @@
 ﻿using Landfall.Haste;
 using Landfall.Modding;
-using System.Net.Sockets;
-using System.Runtime.InteropServices;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Localization;
 using Zorro.Settings;
@@ -10,62 +7,91 @@ using Zorro.Settings;
 namespace FullEnergyStart;
 
 [LandfallPlugin]
-public class Program
+public class UnlimitedEnergy
 {
-    static Program()
+	public static bool IsInHub { get; private set; }
+
+	public static UnlimitedEnergyType UnlimitedEnergyType;
+
+	static UnlimitedEnergy()
 	{
+		On.RunHandler.StartNewRun += OnStartNewRun;
+		On.GM_Hub.Start += GmHubStart;
+		On.GM_Hub.OnDestroy += GmHubOnDestroy;
+
 		var go = new GameObject(nameof(EnergyUpdater));
 		UnityEngine.Object.DontDestroyOnLoad(go);
 		go.AddComponent<EnergyUpdater>();
-    }
+	}
+
+	private static void GmHubStart(On.GM_Hub.orig_Start orig, GM_Hub self)
+	{
+		orig(self);
+		IsInHub = true;
+	}
+
+	private static void GmHubOnDestroy(On.GM_Hub.orig_OnDestroy orig, GM_Hub self)
+	{
+		orig(self);
+		IsInHub = false;
+	}
+
+	private static void OnStartNewRun(On.RunHandler.orig_StartNewRun orig, RunConfig setconfig, int shardid, int seed, RunConfigRuntimeData setrunconfigruntimedata)
+	{
+		orig(setconfig, shardid, seed, setrunconfigruntimedata);
+		IsInHub = false;
+
+		var isStartingAtMax = GameHandler.Instance.SettingsHandler.GetSetting<StartWithFullEnergySetting>().Value;
+		EnergyUpdater.SetPlayerEnergy(isStartingAtMax);
+	}
 }
 
 public class EnergyUpdater : MonoBehaviour
 {
-	void Update()
+	internal void Update()
 	{
-		if (GameHandler.Instance?.SettingsHandler == null)
-			return;
-
-		var setting = GameHandler.Instance.SettingsHandler.GetSetting<UnlimitedEnergyTypeSetting>();
-
-		if (setting == null)
-			return;
-
-		if (setting.Value == UnlimitedEnergyType.Off)
-			return;
-
-		if (setting.Value == UnlimitedEnergyType.HubOnly)
+		switch (UnlimitedEnergy.UnlimitedEnergyType)
 		{
-			if (!GM_Hub.isInHub)
-			{
+			case UnlimitedEnergyType.Off:
+			case UnlimitedEnergyType.HubOnly when !UnlimitedEnergy.IsInHub:
 				return;
-			}
+
+			case UnlimitedEnergyType.AlwaysOn:
+			default:
+				SetPlayerEnergy();
+				break;
+		}
+	}
+
+	public static void SetPlayerEnergy(bool isFull = true)
+	{
+		if (StopHandler.IsStopped
+			|| Player.localPlayer?.character == null
+			|| !Player.localPlayer.character.data.allowInput)
+		{
+			return;
 		}
 
-		if (StopHandler.IsStopped)
+		if (!isFull)
+		{
+			Player.localPlayer.data.energy = 0;
 			return;
-
-		if (Player.localPlayer?.character == null)
-			return;
-
-		if (!Player.localPlayer.character.data.allowInput)
-			return;
+		}
 
 		var maxEnergy = Player.localPlayer.stats.maxEnergy.baseValue * Player.localPlayer.stats.maxEnergy.multiplier;
-		if (Player.localPlayer.data.energy >= maxEnergy)
-			return;
 
-		Player.localPlayer.data.energy = maxEnergy;
-		//PlayerCharacter.localPlayer.data.stopGainEnergy = false;
+		if (Player.localPlayer.data.energy < maxEnergy)
+		{
+			Player.localPlayer.data.energy = maxEnergy;
+		}
 	}
 }
 
 public enum UnlimitedEnergyType
 {
-	Off,
-	HubOnly,
-	AlwaysOn
+	Off = 0,
+	HubOnly = 1,
+	AlwaysOn = 2
 }
 
 [HasteSetting]
@@ -73,18 +99,43 @@ public class UnlimitedEnergyTypeSetting : EnumSetting<UnlimitedEnergyType>, IExp
 {
 	public override void ApplyValue()
 	{
-		//Debug.Log($"UnlimitedEnergyTypeSetting apply value {Value}");
+		UnlimitedEnergy.UnlimitedEnergyType = Value;
+	}
+
+	public override void Load(ISettingsSaveLoad loader)
+	{
+		base.Load(loader);
+		UnlimitedEnergy.UnlimitedEnergyType = Value;
 	}
 
 	protected override UnlimitedEnergyType GetDefaultValue() => UnlimitedEnergyType.HubOnly;
 
-	public override List<LocalizedString> GetLocalizedChoices() =>
-	[
+	public override List<LocalizedString> GetLocalizedChoices() => new()
+	{
 		new UnlocalizedString("Off"),
 		new UnlocalizedString("Hub Only"),
 		new UnlocalizedString("Always On")
-	];
+	};
 
 	public LocalizedString GetDisplayName() => new UnlocalizedString("Unlimited Energy Type");
+
+	public string GetCategory() => "Mods";
+}
+
+[HasteSetting]
+public class StartWithFullEnergySetting : BoolSetting, IExposedSetting
+{
+	public override void ApplyValue()
+	{
+	}
+
+	protected override bool GetDefaultValue() => false;
+
+	public override LocalizedString OffString => new UnlocalizedString("Disabled (Default)");
+
+	public override LocalizedString OnString => new UnlocalizedString("Enabled");
+
+	public LocalizedString GetDisplayName() => new UnlocalizedString("Unlimited Energy: Start run with full energy");
+
 	public string GetCategory() => "Mods";
 }
